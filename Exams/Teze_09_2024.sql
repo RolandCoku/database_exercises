@@ -171,15 +171,13 @@ WHERE kohe_fillimi BETWEEN TO_DATE('20-05-2025', 'DD-MM-YYYY') AND SYSDATE;
  4. Per secilin vend parkimi te shfaqen emrat e klienteve qe kane parkuar te pakten 5 here brenda nje date.
  */
 
-SELECT vp.adresa, k.emri, k.mbiemri
-FROM vend_parkimi vp
-JOIN klienti k ON k.klienti_id IN (
-    SELECT p.klienti_id
-    FROM parkimi p
-    WHERE p.vend_parkimi_id = vp.vend_parkimi_id
-    GROUP BY p.vend_parkimi_id, p.klienti_id, TRUNC(kohe_fillimi)
-    HAVING COUNT(p.parkimi_id) >= 5
-);
+SELECT k.klienti_id, k.emri, k.mbiemri, TRUNC(p.kohe_fillimi) AS data_parkimi, 
+       v.vend_parkimi_id
+FROM klienti k 
+JOIN parkimi p ON p.klienti_id = k.klienti_id
+JOIN vend_parkimi v ON p.vend_parkimi_id = v.vend_parkimi_id 
+GROUP BY k.klienti_id, k.emri, k.mbiemri, TRUNC(p.kohe_fillimi), v.vend_parkimi_id
+HAVING COUNT(*) >= 5;
 
 /*
  5. Shtoni mundesine qe nje mjet mund te kete disa kliente dsi dhe nje klient te kete disa mjete dhe karta,

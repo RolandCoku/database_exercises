@@ -135,11 +135,11 @@ INSERT INTO mjeti (targa, marka, modeli, ngjyra, statusi)
 VALUES ('CC789DD', 'Ford', 'Focus', 'E zezë', '1');
 
 INSERT INTO parkimi (parkimi_id, cmimi_id, targa, klienti_id, karta_id, vend_parkimi_id, kohe_fillimi, kohe_mbarimi, afat_qendrimi, nr_ore, vlera, statusi)
-VALUES (parkimi_id_seq.NEXTVAL, 1, 'AA123BB', (
+VALUES (parkimi_id_seq.NEXTVAL, 1, 'BB456CC', (
     SELECT klienti_id
     FROM klienti
     WHERE emri = 'Roland' AND mbiemri = 'Çoku' AND nr_tel = '23112321421'
-    ), 1, 2, SYSDATE - INTERVAL '2' HOUR, SYSDATE, 1.5, 2, 100, 'A');
+    ), 1, 1, SYSDATE - INTERVAL '2' HOUR, SYSDATE, 1.5, 2, 100, 'A');
 INSERT INTO parkimi (parkimi_id, cmimi_id, targa, klienti_id, karta_id, vend_parkimi_id, kohe_fillimi, kohe_mbarimi, afat_qendrimi, nr_ore, vlera, statusi)
 VALUES (parkimi_id_seq.NEXTVAL, 2, 'BB456CC', (
     SELECT klienti_id
@@ -244,56 +244,45 @@ END;
     klient te percaktuar.
  */
 
-SELECT *
-FROM vend_parkimi vp
-WHERE vp.vend_parkimi_id IN (
-    SELECT p.vend_parkimi_id
-    FROM parkimi p
-    WHERE klienti_id IS NULL
-    GROUP BY p.vend_parkimi_id
-    HAVING COUNT(p.parkimi_id) = (
-        SELECT MAX(parkime)
-        FROM (
-            SELECT COUNT(p2.parkimi_id) AS parkime
-            FROM parkimi p2
-            WHERE p2.klienti_id IS NULL
-            GROUP BY p2.vend_parkimi_id
-        )
-    )
-);
+--Metoda Luisit
 
-select p.parkimi_id, v.adresa
-from parkimi p join vend_parkimi v on p.parkimi_id = v.vend_parkimi_id
-where p.klienti_id is null
-group by p.parkimi_id,v.adresa
-having count(*)= (select max(count(*))
-                  from parkimi p
-                  where p.klienti_id is null
-                  group by p.parkimi_id);
+SELECT vp.vend_parkimi_id, vp.adresa, COUNT(p.parkimi_id) AS NUMRI_PARKIMEVE
+FROM vend_parkimi vp
+JOIN parkimi p ON p.vend_parkimi_id = vp.vend_parkimi_id
+WHERE p.klienti_id IS NULL
+GROUP BY vp.vend_parkimi_id, vp.adresa
+ORDER BY NUMRI_PARKIMEVE DESC
+FETCH FIRST 1 ROWS ONLY;
+
+--Metode e pergjithshme duke marre parasysh vende parkimi te cilat kane te njejten numer maksimal parkimesh
+
+SELECT vp.vend_parkimi_id, vp.adresa, COUNT(p.parkimi_id) AS numri_parkimeve
+FROM vend_parkimi vp
+JOIN parkimi p ON p.vend_parkimi_id = vp.vend_parkimi_id
+WHERE klienti_id IS NULL
+GROUP BY vp.vend_parkimi_id, vp.adresa
+HAVING COUNT(p.parkimi_id) = (
+    SELECT MAX(COUNT(p2.parkimi_id))
+    FROM parkimi p2
+    WHERE p2.klienti_id IS NULL
+    GROUP BY p2.vend_parkimi_id
+    );
 
 /*
  7. Te afishohet marka e makinave qe parkojne me shpesh ne secilin vend parkimi.
  */
 
-SELECT vp.adresa, m.marka
-FROM vend_parkimi vp
-CROSS JOIN mjeti m
-WHERE m.targa IN (
-    SELECT p.targa
-    FROM parkimi p
-    WHERE p.vend_parkimi_id = vp.vend_parkimi_id
-    GROUP BY p.targa
-    HAVING COUNT(p.parkimi_id) = (
-        SELECT MAX(vehicle_parkings)
-        FROM (
-            SELECT COUNT(p2.parkimi_id) AS vehicle_parkings
-            FROM parkimi p2
-            WHERE p2.vend_parkimi_id = vp.vend_parkimi_id
-            GROUP BY p2.targa
-        )
-    )
-);
-
+SELECT vp.vend_parkimi_id, vp.adresa, m.marka, COUNT(p.targa) AS times_parked
+FROM mjeti m
+JOIN parkimi p ON p.targa = m.targa
+JOIN vend_parkimi vp ON p.vend_parkimi_id = vp.vend_parkimi_id
+GROUP BY vp.vend_parkimi_id, vp.adresa, m.marka
+HAVING COUNT(p.targa) = (
+    SELECT MAX(COUNT(p2.targa))
+    FROM parkimi p2
+    WHERE p2.vend_parkimi_id = vp.vend_parkimi_id
+    GROUP BY p2.vend_parkimi_id, p2.targa
+    );
 
 /*
  8. Te ndertohet nje rol dhe perdorues administrator qe administron te dhenat dhe nje rol punonjesi i cili ploteson kliente,
@@ -331,7 +320,6 @@ BEGIN
         DECLARE
             v_current_time NUMBER := EXTRACT(HOUR FROM SYSDATE);
         BEGIN
-
             IF (v_current_time < 6 || v_current_time > 22) THEN
                 RAISE_APPLICATION_ERROR(-20001, 'Punonjesi nuk mund te kryeje veprime ne kete ore');
             END IF;

@@ -248,12 +248,12 @@ END;
 
 SELECT *
 FROM vend_parkimi vp
-WHERE vp.vend_parkimi_id = (
+WHERE vp.vend_parkimi_id IN (
     SELECT p.vend_parkimi_id
     FROM parkimi p
     WHERE klienti_id IS NULL
     GROUP BY p.vend_parkimi_id
-    HAVING COUNT(p.parkimi_id) IN (
+    HAVING COUNT(p.parkimi_id) = (
         SELECT MAX(parkime)
         FROM (
             SELECT COUNT(p2.parkimi_id) AS parkime
@@ -263,6 +263,15 @@ WHERE vp.vend_parkimi_id = (
         )
     )
 );
+
+select p.parkimi_id, v.adresa
+from parkimi p join vend_parkimi v on p.parkimi_id = v.vend_parkimi_id
+where p.klienti_id is null
+group by p.parkimi_id,v.adresa
+having count(*)= (select max(count(*))
+                  from parkimi p
+                  where p.klienti_id is null
+                  group by p.parkimi_id);
 
 /*
  7. Te afishohet marka e makinave qe parkojne me shpesh ne secilin vend parkimi.
@@ -286,6 +295,7 @@ WHERE m.targa IN (
         )
     )
 );
+
 
 /*
  8. Te ndertohet nje rol dhe perdorues administrator qe administron te dhenat dhe nje rol punonjesi i cili ploteson kliente,

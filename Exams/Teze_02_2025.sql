@@ -265,6 +265,21 @@ HAVING COUNT(CASE WHEN PS.NOTA > 4 THEN PS.studenti_id END) = (
     )
 );
 
+-- Shorter solution
+
+SELECT ln.lenda_id, ln.emertimi, COUNT(ps.provimi_id)
+FROM PROVIMI p
+JOIN LENDA ln ON p.lenda_id = ln.lenda_id
+JOIN PROVIMI_STUDENTI ps ON p.provimi_id = ps.provimi_id AND ps.nota <= 4
+GROUP BY ln.lenda_id, ln.emertimi
+HAVING COUNT(ps.provimi_id) = (
+    SELECT MAX(COUNT(ps2.provimi_id))
+    FROM PROVIMI p2
+    JOIN LENDA L ON p2.lenda_id = L.lenda_id
+    JOIN PROVIMI_STUDENTI ps2 ON p2.provimi_id = ps2.provimi_id AND ps2.nota <= 4
+    GROUP BY L.lenda_id
+    );
+
 /*
  6. Te ndertohet nje funksion qe kthen mesataren e studentit (vetem notat kaluese, nese nuk ka nota kaluese kthen 0) me
     pas kjo kjo te perdoret ne nje select.

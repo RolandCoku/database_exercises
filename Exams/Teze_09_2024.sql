@@ -280,8 +280,9 @@ GROUP BY vp.vend_parkimi_id, vp.adresa, m.marka
 HAVING COUNT(p.targa) = (
     SELECT MAX(COUNT(p2.targa))
     FROM parkimi p2
+    JOIN mjeti m2 ON p2.targa = m2.targa
     WHERE p2.vend_parkimi_id = vp.vend_parkimi_id
-    GROUP BY p2.vend_parkimi_id, p2.targa
+    GROUP BY p2.vend_parkimi_id, m2.marka
     );
 
 /*

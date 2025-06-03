@@ -246,8 +246,42 @@ BEGIN
     END IF;
 END;
 
+/*
+ 9. Shkruani nje procedure e cila do te listoje te gjithe studentet dhe vitin ne baze te krediteve te grumbulluara per vitin e ri akademik.
+    Nese ka plotesuar 180 kredite te cilesohet i diplomuar.
+ */
+
+CREATE OR REPLACE PROCEDURE GET_STUDENTS_CURRENT_YEAR
+IS
+    CURSOR c_students IS
+        SELECT s.emri,
+               s.mbiemri,
+               SUM(l.nr_kredite) AS numri_krediteve
+        FROM student s
+        JOIN grupi g ON s.grupi_id = g.grupi_id
+        JOIN studenti_lenda sl ON sl.studenti_id = s.student_id
+        JOIN lenda l ON sl.kodi = l.kodi
+        WHERE s.statusi = '1' AND sl.nota > 4
+        GROUP BY s.emri, s.mbiemri;
+    v_viti VARCHAR2(20);
+BEGIN
+
+    FOR std IN c_students LOOP
+
+        CASE
+            WHEN std.numri_krediteve BETWEEN 0 AND 29 THEN v_viti := '1';
+            WHEN std.numri_krediteve BETWEEN 30 AND 79 THEN v_viti := '2';
+            WHEN std.numri_krediteve BETWEEN 80 AND 179 THEN v_viti := '3';
+            WHEN std.numri_krediteve = 180 THEN v_viti := 'Diplomuar';
+        END CASE;
+
+        DBMS_OUTPUT.PUT_LINE(std.emri || ' ' || std.mbiemri || ': Viti ' || v_viti);
+    END LOOP;
+
+END;
 
 
-
-
+BEGIN
+    GET_STUDENTS_CURRENT_YEAR();
+END;
 

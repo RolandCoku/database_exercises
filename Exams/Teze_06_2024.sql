@@ -14,6 +14,11 @@ CREATE TABLE student(
     statusi VARCHAR2(1)
 );
 
+INSERT INTO student (student_id, emri, mbiemri, dt_lindje, email, grupi_id, statusi)
+SELECT 5, s.emri, s.mbiemri, s.dt_lindje, 'testre@gmail.com', s.grupi_id, s.statusi
+FROM student s
+WHERE student_id = 1;
+
 CREATE TABLE grupi(
     grupi_id INTEGER,
     emertimi VARCHAR2(20),
@@ -94,8 +99,8 @@ INSERT INTO student (student_id, emri, mbiemri, dt_lindje, email, grupi_id, stat
 VALUES (student_id_seq.nextval, 'Roland', 'Coku', TO_DATE('18-02-2002', 'DD-MM-YYYY'), 'rolandcoku@gmail.com', 3, '1');
 INSERT INTO student (student_id, emri, mbiemri, dt_lindje, email, grupi_id, statusi)
 VALUES (student_id_seq.nextval, 'TestName', 'TestSurname', TO_DATE('05-06-2004', 'DD-MM-YYYY'), 'test@test.com', 1, '1');
-INSERT INTO student (student_id, emri, mbiemri, dt_lindje, email, grupi_id, statusi)
-VALUES (student_id_seq.nextval, 'Test2Name', 'Test2Surname', TO_DATE('02-12-2005', 'DD-MM-YYYY'), 'test2@test.com', 2, '1');
+INSERT INTO student
+VALUES (student_id_seq.nextval, 'Test2Name', 'Test2Surname', TO_DATE('02-12-2005', 'DD-MM-YYYY'), 'test3@test.com', 2, '1');
 
 INSERT INTO lenda (kodi, emertimi, nr_kredite, semestri, statusi)
 VALUES ('12345', 'Analize 2', 6, 'II', '1');
@@ -124,6 +129,18 @@ INSERT INTO studenti_lenda (studenti_id, kodi, nota, frekuentimi, detyra, labora
 VALUES (2, '14352', 6, 1, '1', '1');
 INSERT INTO studenti_lenda (studenti_id, kodi, nota, frekuentimi, detyra, laboratore)
 VALUES (1, '12342', 6, 1, '1', '1');
+
+INSERT INTO studenti_lenda (studenti_id, kodi, nota, frekuentimi, detyra, laboratore)
+SELECT student_id, '12345', CASE
+                                WHEN MOD(6, 2) = 0 THEN 3
+                                WHEN MOD(6, 2) <> 0 THEN 4
+                            END, '1', '1', '1'
+FROM student;
+
+UPDATE studenti_lenda SET nota  = CASE WHEN MOD(nota, 2) = 0 THEN nota/2
+                                    WHEN MOD(nota, 2) <> 0 THEN nota/10 END;
+
+
 
 COMMIT;
 
@@ -234,6 +251,8 @@ CREATE ROLE pedagog;
 GRANT SELECT ON lenda TO pedagog;
 GRANT SELECT ON grupi TO pedagog;
 GRANT SELECT, INSERT, UPDATE, DELETE ON provimi TO pedagog;
+
+SELECT TRUNC(SYSDATE, 'MONTH') FROM DUAL;
 
 CREATE OR REPLACE TRIGGER chck_valid_month_trg
 BEFORE INSERT OR UPDATE OR DELETE ON provimi

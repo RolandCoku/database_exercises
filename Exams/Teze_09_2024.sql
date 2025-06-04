@@ -134,6 +134,8 @@ VALUES ('BB456CC', 'Honda', 'Civic', 'E bardhë', '1');
 INSERT INTO mjeti (targa, marka, modeli, ngjyra, statusi)
 VALUES ('CC789DD', 'Ford', 'Focus', 'E zezë', '1');
 
+
+
 INSERT INTO parkimi (parkimi_id, cmimi_id, targa, klienti_id, karta_id, vend_parkimi_id, kohe_fillimi, kohe_mbarimi, afat_qendrimi, nr_ore, vlera, statusi)
 VALUES (parkimi_id_seq.NEXTVAL, 1, 'BB456CC', (
     SELECT klienti_id

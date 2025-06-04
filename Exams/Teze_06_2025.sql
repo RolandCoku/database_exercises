@@ -233,16 +233,137 @@ CREATE OR REPLACE TRIGGER prevent_ticket_booking_after_10_minutes
 BEFORE INSERT ON bileta
 FOR EACH ROW
 DECLARE
-    v_date DATE;
     v_ora INTEGER;
     v_movie_start_time DATE;
 BEGIN
 
     SELECT ora
-        INTO v_ora
+    INTO v_ora
     FROM orar
     WHERE orari_id = :NEW.orari_id;
 
-    v_movie_start_time := v_date + (v_ora / 24);
-END;
+    v_movie_start_time := :NEW.data + (v_ora / 24);
 
+    IF v_movie_start_time < SYSDATE - INTERVAL '10' MINUTE THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Nuk lejohet te presin bileta per nje orar qe ka me shume se 10 minuta qe ka filluar filmi.');
+    END IF;
+
+END prevent_ticket_booking_after_10_minutes;
+/
+
+/*
+ 7. Ndertoni nje procedure e cila do te beje rezervimin per nje film_id, nje orar_id dhe nje numer biletash te caktuar.
+    Rezevimi do te bejet duke mundesuar qe shperndarja ne rreshta dhe ne rradhe te salles te jene bashke dhe nese nuk eshte e mundur te mos beje rezervim.
+ */
+
+CREATE OR REPLACE PROCEDURE rezervim_bilete(
+    p_filmi_id IN INTEGER,
+    p_orari_id IN INTEGER,
+    p_numri_biletave IN INTEGER
+) IS
+    v_salla_id INTEGER;
+    v_kapaciteti INTEGER;
+    v_nr_rreshta INTEGER;
+    v_rezervuar INTEGER;
+    v_rreshti INTEGER;
+    v_rradh INTEGER;
+    v_seats_per_row INTEGER;
+    v_cmimi NUMBER(10,2);
+    v_found_seats BOOLEAN := FALSE;
+
+    no_consecutive_seats EXCEPTION;
+BEGIN
+    SELECT s.salla_id, s.kapaciteti, s.nr_rreshta, o.cmimi
+    INTO v_salla_id, v_kapaciteti, v_nr_rreshta, v_cmimi
+    FROM orar o
+             JOIN salla s ON o.salla_id = s.salla_id
+    WHERE o.orari_id = p_orari_id AND o.filmi_id = p_filmi_id;
+
+    -- Calculate seats per row (assuming equal distribution)
+    v_seats_per_row := CEIL(v_kapaciteti / v_nr_rreshta);
+
+    -- Check total available capacity
+    SELECT COUNT(*)
+    INTO v_rezervuar
+    FROM bileta
+    WHERE orari_id = p_orari_id;
+
+    IF (v_rezervuar + p_numri_biletave) > v_kapaciteti THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Nuk ka vend të mjaftueshëm në sallë. ' ||
+                                        'Kapaciteti: ' || v_kapaciteti || ', Rezervuar: ' || v_rezervuar ||
+                                        ', Kërkuar: ' || p_numri_biletave);
+    END IF;
+
+    -- Find consecutive seats
+    FOR current_row IN 1..v_nr_rreshta
+        LOOP
+            -- Check if we can fit all seats in this row
+            IF p_numri_biletave <= v_seats_per_row THEN
+                -- Try to find consecutive seats in current row
+                FOR start_seat IN 1..(v_seats_per_row - p_numri_biletave + 1)
+                    LOOP
+                        -- Check if all seats from start_seat to start_seat + p_numri_biletave - 1 are free
+                        SELECT COUNT(*)
+                        INTO v_rezervuar
+                        FROM bileta
+                        WHERE orari_id = p_orari_id
+                          AND rreshti = current_row
+                          AND rradhe BETWEEN start_seat AND (start_seat + p_numri_biletave - 1);
+
+                        -- If no seats are occupied in this range, we found our spots
+                        IF v_rezervuar = 0 THEN
+                            v_rreshti := current_row;
+                            v_rradh := start_seat;
+                            v_found_seats := TRUE;
+                            EXIT;
+                        END IF;
+                    END LOOP;
+
+                IF v_found_seats THEN
+                    EXIT;
+                END IF;
+            END IF;
+        END LOOP;
+
+    IF NOT v_found_seats THEN
+        RAISE no_consecutive_seats;
+    END IF;
+
+    FOR i IN 0..(p_numri_biletave - 1) LOOP
+            INSERT INTO bileta (
+                orari_id,
+                data,
+                cmimi,
+                rreshti,
+                rradhe,
+                rezervimi_online
+            )
+            VALUES (
+                p_orari_id,
+                SYSDATE,
+                v_cmimi,
+                v_rreshti,
+                v_rradh + i,
+                'Y'
+            );
+        END LOOP;
+
+    COMMIT;
+
+EXCEPTION
+    WHEN no_consecutive_seats THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20002,
+                                'Nuk mund të gjenden ' || p_numri_biletave || ' vende të njëpasnjëshme në sallë.');
+
+    WHEN NO_DATA_FOUND THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20003,
+                                'Orari ose filmi i specifikuar nuk ekziston.');
+
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20004,
+                                'Gabim gjatë rezervimit: ' || SQLERRM);
+END rezervim_bilete;
+/

@@ -166,8 +166,83 @@ BEGIN
     RETURN c_client_movies;
 END;
 
--- Duke perdorur records
+-- Zgjidhja duke perdorur records
+CREATE OR REPLACE TYPE movie_record AS OBJECT (
+    filmi_id INTEGER,
+    kinema_id INTEGER,
+    salla_id INTEGER
+);
 
-CREATE
+CREATE OR REPLACE TYPE movie_record_array AS TABLE OF movie_record;
 
-CREATE OR REPLACE FUNCTION
+CREATE OR REPLACE FUNCTION GET_CLIENT_MOVIES_ARRAY(
+    p_klienti_id INTEGER,
+    p_date DATE
+) RETURN movie_record_array
+IS
+    v_movies movie_record_array;
+BEGIN
+    SELECT movie_record(o.filmi_id, s.kinema_id, s.salla_id)
+    BULK COLLECT INTO v_movies
+    FROM bileta b
+    JOIN orar o ON b.orari_id = o.orari_id
+    JOIN salla s ON o.salla_id = s.salla_id
+    WHERE b.klienti_id = p_klienti_id AND TRUNC(b.data) = TRUNC(p_date);
+
+    RETURN v_movies;
+END;
+
+-- Thirrje funksionit
+DECLARE
+    v_movies movie_record_array;
+BEGIN
+    v_movies := GET_CLIENT_MOVIES_ARRAY(1, TO_DATE('22-05-2025', 'DD-MM-YYYY'));
+
+    FOR i IN 1 .. v_movies.COUNT LOOP
+        DBMS_OUTPUT.PUT_LINE('Filmi ID: ' || v_movies(i).filmi_id || ', Kinema ID: ' || v_movies(i).kinema_id || ', Salla ID: ' || v_movies(i).salla_id);
+    END LOOP;
+END;
+
+/*
+ 6. Te ndertohet nje rol dhe perdorues menaxher qe administron te dhenat e kinemave, sallave, punonjes, filmave dhe orareve
+    dhe nje rol Punonjes i cili ploteson klientet dhe biletat.
+    Perdoruesit e rolit punonjes te mos leohet te presin bileta per nje orar qe ka me shume se 10 minuta qe ka filluar filmi.
+ */
+
+CREATE ROLE menaxher;
+GRANT CONNECT TO menaxher;
+
+GRANT ALL ON kinema TO menaxher;
+GRANT ALL ON salla TO menaxher;
+GRANT ALL ON filmi TO menaxher;
+GRANT ALL ON orar TO menaxher;
+GRANT ALL ON punonjesi TO menaxher;
+
+CREATE USER menaxher_user IDENTIFIED BY menaxher_password;
+GRANT menaxher TO menaxher_user;
+
+CREATE ROLE punonjes;
+GRANT CONNECT TO punonjes;
+
+GRANT INSERT, UPDATE ON klienti TO punonjes;
+GRANT SELECT, INSERT, UPDATE ON bileta TO punonjes;
+GRANT SELECT ON orar TO punonjes;
+GRANT SELECT ON punonjesi TO punonjes;
+
+CREATE OR REPLACE TRIGGER prevent_ticket_booking_after_10_minutes
+BEFORE INSERT ON bileta
+FOR EACH ROW
+DECLARE
+    v_date DATE;
+    v_ora INTEGER;
+    v_movie_start_time DATE;
+BEGIN
+
+    SELECT ora
+        INTO v_ora
+    FROM orar
+    WHERE orari_id = :NEW.orari_id;
+
+    v_movie_start_time := v_date + (v_ora / 24);
+END;
+

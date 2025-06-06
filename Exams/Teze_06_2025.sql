@@ -244,10 +244,13 @@ BEGIN
 
     v_movie_start_time := :NEW.data + (v_ora / 24);
 
-    IF v_movie_start_time < SYSDATE - INTERVAL '10' MINUTE THEN
-        RAISE_APPLICATION_ERROR(-20001, 'Nuk lejohet te presin bileta per nje orar qe ka me shume se 10 minuta qe ka filluar filmi.');
-    END IF;
+    IF 'punonjes' IN (SELECT ROLE FROM SESSION_ROLES) THEN
+        -- Check if the user is a 'punonjes'
+        IF v_movie_start_time < SYSDATE - INTERVAL '10' MINUTE THEN
+            RAISE_APPLICATION_ERROR(-20001, 'Nuk lejohet te presin bileta per nje orar qe ka me shume se 10 minuta qe ka filluar filmi.');
+        END IF;
 
+    END IF;
 END prevent_ticket_booking_after_10_minutes;
 /
 
